@@ -1,32 +1,52 @@
+import pandas as pd
+import joblib
+from sklearn.model_selection import GridSearchCV
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.pipeline import Pipeline
-from sklearn.model_selection import GridSearchCV
-from imblearn.over_sampling import SMOTE
+from sklearn.compose import ColumnTransformer
+from sklearn.preprocessing import StandardScaler
 
-def train_model(preprocessor, X_train, y_train):
+df = pd.read_csv("ai4i2020.csv")
 
-    smote = SMOTE(random_state=42)
+features = [
+    "Air temperature [K]",
+    "Process temperature [K]",
+    "Rotational speed [rpm]",
+    "Torque [Nm]",
+    "Tool wear [min]"
+]
 
-    model = RandomForestClassifier(random_state=42)
+X = df[features]
+y = df["Machine failure"]
 
-    pipeline = Pipeline(steps=[
-        ("preprocessor", preprocessor),
-        ("classifier", model)
-    ])
+preprocessor = ColumnTransformer(
+    transformers=[
+        ("num", StandardScaler(), features)
+    ]
+)
 
-    param_grid = {
-        "classifier__n_estimators": [100, 200],
-        "classifier__max_depth": [None, 10, 20]
-    }
+pipeline = Pipeline([
+    ("preprocessor", preprocessor),
+    ("classifier", RandomForestClassifier(random_state=42))
+])
 
-    grid = GridSearchCV(
-        pipeline,
-        param_grid,
-        cv=5,
-        scoring="roc_auc",
-        n_jobs=-1
-    )
+param_grid = {
+    "classifier__n_estimators": [100, 200],
+    "classifier__max_depth": [None, 10, 20]
+}
 
-    grid.fit(X_train, y_train)
+grid_search = GridSearchCV(
+    pipeline,
+    param_grid,
+    cv=5,
+    scoring="roc_auc",
+    n_jobs=-1
+)
 
-    return grid.best_estimator_
+grid_search.fit(X, y)
+
+best_model = grid_search.best_estimator_
+
+joblib.dump(best_model, "industrial_failure_model.pkl")
+
+print("Best ROC-AUC:", grid_search.best_score_)
